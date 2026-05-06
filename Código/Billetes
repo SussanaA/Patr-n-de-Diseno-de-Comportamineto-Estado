@@ -1,0 +1,46 @@
+using System;
+using System.Windows.Forms;
+
+namespace MaquinaExpEstado03
+{
+    //visualizacion de los billetes
+    public partial class Form3 : Form
+    {
+        //referencia a form1
+        Form1 form1;
+
+        public Form3(Form1 forma1)
+        {
+            InitializeComponent();
+
+            //guarda el acceso al form1
+            form1 = forma1;
+        }
+
+        //ingresa billete de 20
+        private void pbBillete20_Click(object sender, EventArgs e)
+        {
+            // envia el valor del billete al contexto
+            form1.contexto.IngresarDinero(20);
+
+            //actualiza el saldo en pantalla
+            form1.MostrarSaldo();
+        }
+
+        //ingresa billete de 50
+        private void pbBillete50_Click(object sender, EventArgs e)
+        {
+            form1.contexto.IngresarDinero(50);
+            form1.MostrarSaldo();
+        }
+
+        //ingresa billete de 100
+        private void pbBillete100_Click(object sender, EventArgs e)
+        {
+            form1.contexto.IngresarDinero(100);
+            form1.MostrarSaldo();
+        }
+
+        private void Form3_Load(object sender, EventArgs e) { }
+    }
+}
