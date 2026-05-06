@@ -1,0 +1,54 @@
+using System;
+using System.Windows.Forms;
+
+namespace MaquinaExpEstado03
+{
+    //vista de las monedas
+    public partial class Form2 : Form
+    {
+        //referencia a form1
+        Form1 form1;
+
+        //recibe como referencia al form1
+        public Form2(Form1 forma1)
+        {
+            InitializeComponent();
+
+            //guarda el acceso al form1
+            form1 = forma1;
+        }
+
+        //ingresa moneda de 1
+        private void pbMoneda1_Click(object sender, EventArgs e)
+        {
+            //envia el valor de la moneda al contexto
+            form1.contexto.IngresarDinero(1);
+
+            //actualiza el saldo en pantalla
+            form1.MostrarSaldo();
+        }
+
+        //ingresa moneda de 2
+        private void pbMoneda2_Click(object sender, EventArgs e)
+        {
+            form1.contexto.IngresarDinero(2);
+            form1.MostrarSaldo();
+        }
+
+        //ingresa moneda de 5
+        private void pbMoneda5_Click(object sender, EventArgs e)
+        {
+            form1.contexto.IngresarDinero(5);
+            form1.MostrarSaldo();
+        }
+
+        //ingresa moneda de 10
+        private void pbMoneda10_Click(object sender, EventArgs e)
+        {
+            form1.contexto.IngresarDinero(10);
+            form1.MostrarSaldo();
+        }
+
+        private void Form2_Load(object sender, EventArgs e) { }
+    }
+}
