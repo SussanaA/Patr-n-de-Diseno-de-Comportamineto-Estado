@@ -1,0 +1,431 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace MaquinaExpEstado03
+{
+    //interfaz principal de la máquina
+    //con la que el usuario interactua
+    public partial class Form1 : Form
+    {
+        //agrega el context a la forma y lo inicia en estado de espera
+        public Context contexto = new Context(new StateEspera());
+
+        //forms monedas y billetes
+        Form2 monedas;
+        Form3 billetes;
+
+        public Form1()
+        {
+            InitializeComponent();
+
+            //Timer para mostrar precio
+            tmPrecio.Interval = 500;
+            tmPrecio.Tick += TmPrecio_t;
+
+            //Timer para limpiar pantalla
+            tmLimpiar.Interval = 5000;
+            tmLimpiar.Tick += TmLimpia_t;
+
+
+            //dispensar producto
+            tmDispensar.Interval = 3000;
+            tmDispensar.Tick += TmDispensar_Tick;
+
+            //la charola del cambio inicia no visible
+            p2Cambio.Visible = false;
+
+            LimpiarPanel();
+
+            MostrarStock();
+        }
+
+        //Temporizadores
+
+        //Para la consulta del precio
+        private void TmPrecio_t(object sender, EventArgs e)
+        {
+            tmPrecio.Stop();
+
+            if (contexto.precio == 0)
+            {
+                MostrarMensaje(contexto.mensaje);
+                return;
+            }
+
+            MostrarPrecio();
+
+            // iniciar conteo de inactividad
+            tmLimpiar.Start();
+        }
+
+        //limpia pantalla después de cada proceso
+        private void TmLimpia_t(object sender, EventArgs e)
+        {
+            tmLimpiar.Stop();
+
+            lblPantalla.Text = "";
+            txtPantalla.Clear();
+
+            LimpiarCambio();
+        }
+
+        //simula el tiempo que tarda en dispensarse el producto
+        private void TmDispensar_Tick(object sender, EventArgs e)
+        {
+            tmDispensar.Stop();
+            
+            //ejecuta dispensando o recibiendo dinero
+            contexto.Confirmar();
+
+            LimpiarPanel();
+            
+            MostrarStock();
+
+            //guarda temporal el cambio
+            int cambioTemp = contexto.cambio;
+
+            //muestra el estado del proceso
+            MostrarMensaje(contexto.mensaje);
+
+            //si hay cambio
+            if (cambioTemp > 0)
+            {
+                //muestra charola
+                MostrarCambio(cambioTemp);
+            }
+
+            //limpia el cambio
+            contexto.cambio = 0;
+        }
+
+        //BOTONES PRINCIPALES
+        //aceptar segun el estado en el que se encuentre
+        private void btAceptar_Click(object sender, EventArgs e)
+        {
+            contexto.Confirmar();
+
+            // si aún falta dinero
+            if (contexto.SState is StateRecibirDinero)
+            {
+                MostrarMensajeValor(contexto.mensaje, contexto.faltante);
+                return;
+            }
+
+            MostrarMensaje(contexto.mensaje);
+
+            //si esta dispensando
+            if (contexto.SState is StateDispensando)
+            {
+                MostrarPanel(); //simula la entrega
+                tmDispensar.Start(); 
+            }
+        }
+
+        //cancela la operación actual
+        private void btCancelar_Click(object sender, EventArgs e)
+        {
+            //si está dispensando, no permitir cancelar
+            if (contexto.SState is StateDispensando)
+            {
+
+                MostrarMensaje("\nOperación en proceso");
+
+                return;
+            }
+
+            int reembolso = contexto.saldo;
+
+            contexto.Cancelar();
+
+            MostrarMensaje(contexto.mensaje);
+
+            //si dinero antes de cancelar
+            if (reembolso > 0)
+            {
+                MostrarCambio(reembolso);
+            }
+
+            //cerrar forms de monedas y billetes
+            if (monedas != null && !monedas.IsDisposed)
+                monedas.Close();
+
+            if (billetes != null && !billetes.IsDisposed)
+                billetes.Close();
+        }
+
+        //métodos para mostrar
+        //mostrar el cambio
+        public void MostrarCambio(int cambio)
+        {
+            //hace visible la "charola" que indica que hay cambio
+            p2Cambio.Visible = true; 
+            //muestra el cambio
+            lblCambio.Text = "Cambio: " + cambio;
+        }
+
+        public void LimpiarCambio()
+        {
+            //oculta el panel
+            p2Cambio.Visible = false;
+            //limpia el texto del cambio
+            lblCambio.Text = "";
+        }
+
+        //simula el retirar el producto cambiando de color
+        public void MostrarPanel()
+        {
+            p4Dispensador2.BackColor = Color.FromArgb(60, 60, 60);
+        }
+
+        //devuelve el panel al color inicial
+        public void LimpiarPanel()
+        {
+            p4Dispensador2.BackColor = Color.FromArgb(30, 30, 30);
+        }
+
+        //metodos para las etiquetas
+        //actualiza en la pantalla el saldo que se va acumulando
+        public void MostrarSaldo()
+        {
+            lblPantalla.Text = contexto.mensaje;
+            txtPantalla.Text = Convert.ToString(contexto.saldo);
+
+            tmLimpiar.Stop();
+            tmLimpiar.Start();
+
+            //si ya no ingresa dinero o si regreso al estado inicial
+            if (contexto.SState is StateProductoListo || contexto.SState is StateEspera)
+            {
+                //cierra las formas de monedas y billetes
+                if (monedas != null && !monedas.IsDisposed)
+                    monedas.Close();
+
+                if (billetes != null && !billetes.IsDisposed)
+                    billetes.Close();
+            }
+
+        }
+
+        //muestra el precio del producto seleccionado
+        public void MostrarPrecio()
+        {
+            lblPantalla.Text = "\n\nPrecio...";
+            txtPantalla.Text = Convert.ToString(contexto.precio);
+        }
+
+        //mensajes en pantalla según el estatus del proceso
+        public void MostrarMensaje(string mensaje)
+        {
+            lblPantalla.Text = mensaje;
+            txtPantalla.Clear();
+
+            tmLimpiar.Stop();
+            tmLimpiar.Start();
+        }
+
+        //muestra el mensaje acompañado de una cantidad
+        public void MostrarMensajeValor(string mensaje, int valor)
+        {
+            lblPantalla.Text = mensaje;
+            txtPantalla.Text = valor.ToString(); //cantidad
+
+            tmLimpiar.Stop();
+            tmLimpiar.Start();
+        }
+
+        //encargado de actualizar y mostrar la cantidad disponible por producto
+        public void MostrarStock()
+        {
+            lblSP1.Text = contexto.stock[0].ToString();
+            lblSP2.Text = contexto.stock[1].ToString();
+            lblSP3.Text = contexto.stock[2].ToString();
+            lblSP4.Text = contexto.stock[3].ToString();
+            lblSP5.Text = contexto.stock[4].ToString();
+            lblSP6.Text = contexto.stock[5].ToString();
+            lblSP7.Text = contexto.stock[6].ToString();
+            lblSP8.Text = contexto.stock[7].ToString();
+            lblSP9.Text = contexto.stock[8].ToString();
+            lblSP10.Text = contexto.stock[9].ToString();
+            lblSP11.Text = contexto.stock[10].ToString();
+            lblSP12.Text = contexto.stock[11].ToString();
+            lblSP13.Text = contexto.stock[12].ToString();
+            lblSP14.Text = contexto.stock[13].ToString();
+            lblSP15.Text = contexto.stock[14].ToString();
+            lblSP16.Text = contexto.stock[15].ToString();
+        }
+
+        //mostrar las monedas y billetes
+        private void pbMonedas_Click(object sender, EventArgs e)
+        {
+            //si no esta la ventana
+            if (monedas == null || monedas.IsDisposed)
+            {
+                monedas = new Form2(this);
+                monedas.Show();
+            }
+            else
+            {
+                monedas.Focus();
+            }
+        }
+        private void pbMonedas_DoubleClick(object sender, EventArgs e)
+        {
+            //si la ventana esta abierta
+            if (monedas != null && !monedas.IsDisposed)
+            {
+                monedas.Close();
+            }
+        }
+
+        private void pbBilletes_Click(object sender, EventArgs e)
+        {
+            //si no esta la ventana 
+            if (billetes == null || billetes.IsDisposed)
+            {
+                billetes = new Form3(this);
+                billetes.Show();
+            }
+            else
+            {
+                billetes.Focus();
+            }
+        }
+        private void pbBilletes_DoubleClick(object sender, EventArgs e)
+        {
+            //si esta abierta la ventana
+            if (billetes != null && !billetes.IsDisposed)
+            {
+                billetes.Close();
+            }
+        }
+
+        //verifica que al consultar haya dos digitos
+        public void ValidarEtiqueta()
+        {
+            //permite consultar cuando la maquina este en espera
+            if (!(contexto.SState is StateEspera))
+                return;
+
+            //la consulta se realiza cuando se tiene dos digitos
+            if (txtPantalla.Text.Length == 2)
+            {
+                string etiqueta = txtPantalla.Text;
+
+                contexto.ConsultarPrecio(etiqueta);
+
+                lblPantalla.Text = "\nConsultando precio...";
+
+                tmLimpiar.Stop();
+                tmPrecio.Start();
+            }
+        }
+
+        //botones con números
+        //solo permiten un maximo de dos digitos
+        //ya que asi estan compuestas las etiquetas
+        private void bt1_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "1";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt2_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "2";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt3_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "3";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt4_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "4";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt5_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "5";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt6_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "6";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt7_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "7";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt8_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "8";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt9_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "9";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void bt0_Click(object sender, EventArgs e)
+        {
+            if (txtPantalla.Text.Length <= 1)
+            {
+                txtPantalla.Text += "0";
+            }
+
+            ValidarEtiqueta();
+        }
+
+        private void p1Fondo_Paint(object sender, PaintEventArgs e) { }
+
+        private void Form1_DoubleClick(object sender, EventArgs e) { }
+    }
+}
