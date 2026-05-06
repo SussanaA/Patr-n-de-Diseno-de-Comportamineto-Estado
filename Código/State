@@ -1,0 +1,365 @@
+using System;
+
+namespace MaquinaExpEstado03
+{
+    //establece los métodos que debe llevar cada estado
+    public interface State
+    {
+        void IngresarDinero(Context contexto, int cantidad);
+        void ConsultarPrecio(Context contexto, string posicion);
+        void ElegirProducto(Context contexto, string posicion);  
+        void Confirmar(Context contexto);
+        void Cancelar(Context contexto);
+    }
+    
+    public class Context //-------------------------------CONTEXT
+    {
+        //constructor, estado inicial 
+        public Context(State sstate)
+        {
+            SState = sstate;
+        }
+
+        //estado actual
+        public State SState { get; set; }
+        
+        //variables 
+        public int
+            saldo, //dinero que ingresa el usuario
+            precio, //costo del producto
+            cambio, //devolución de dinero restante
+            faltante; //cantidad que falta para completar el costo
+        public string
+            seleccion = "", //número de la etiqueta
+            mensaje = ""; //texto que se muestra junto a la pantalla
+
+        //métodos que delegan la acción al estado actual
+        public void IngresarDinero(int cantidad)
+        {
+            SState.IngresarDinero(this, cantidad);
+        }
+
+        public void ConsultarPrecio(string posicion)
+        {
+            SState.ConsultarPrecio(this, posicion);
+        }
+
+        public void ElegirProducto(string posicion)
+        {
+            SState.ElegirProducto(this, posicion);
+        }
+
+        public void Confirmar()
+        {
+            SState.Confirmar(this);
+        }
+
+        public void Cancelar()
+        {
+            SState.Cancelar(this);
+        }
+
+        //reiniciar
+        //limpia los valores temporales y regresa a un estado inicial
+        public void Reiniciar()
+        {
+            saldo = 0;
+            precio = 0;
+            cambio = 0;
+            faltante = 0;
+            seleccion = "";
+
+            SState = new StateEspera();
+        }
+
+        //Precios por producto
+        public int ObtenerPrecio(string etiqueta)
+        {
+            switch (etiqueta)
+            {
+                case "11": return 14;
+                case "15": return 15;
+                case "18": return 14;
+                case "19": return 15;
+                case "21": return 17;
+                case "23": return 16;
+                case "26": return 18;
+                case "28": return 20;
+                case "30": return 21;
+                case "33": return 25;
+                case "35": return 24;
+                case "37": return 15;
+                case "44": return 18;
+                case "45": return 15;
+                case "48": return 16;
+                case "49": return 18;
+                default: return 0;
+            }
+        }
+
+        //cantidad de disponible por producto
+        public int[] stock =
+        {
+            1, //11
+            2, //15
+            2, //18
+            4, //19
+            3, //21
+            2, //23
+            3, //26
+            1, //28
+            4, //30
+            1, //33
+            2, //35
+            3, //37
+            1, //44
+            4, //45
+            2, //48
+            3  //49
+        };
+
+        //busca el stock según la etiqueta en la que este el producto
+        public int ObtenerStock(string etiqueta)
+        {
+            switch (etiqueta)
+            {
+                case "11": return stock[0];
+                case "15": return stock[1];
+                case "18": return stock[2];
+                case "19": return stock[3];
+                case "21": return stock[4];
+                case "23": return stock[5];
+                case "26": return stock[6];
+                case "28": return stock[7];
+                case "30": return stock[8];
+                case "33": return stock[9];
+                case "35": return stock[10];
+                case "37": return stock[11];
+                case "44": return stock[12];
+                case "45": return stock[13];
+                case "48": return stock[14];
+                case "49": return stock[15];
+                default: return -1;
+            }
+        }
+    } 
+
+    public class StateEspera : State //----------------------------------ESPERA
+    {
+        public void IngresarDinero(Context contexto, int cantidad)
+        {
+            //verifica si se consulto un producto
+            //si no se ha consultado no permite ingresar dinero
+            if (contexto.precio == 0)
+            {
+                contexto.mensaje = "Primero consulte producto";
+                return;
+            }
+            
+            //asigna el dinero ingresado al saldo actual
+            contexto.saldo += cantidad;
+
+            //si el saldo es igual o mayor al costo
+            if (contexto.saldo >= contexto.precio)
+            {
+                //muestra que ya se completó el saldo
+                contexto.mensaje = "\nSaldo completo";
+                //cambia al estado donde puede confirmar compra
+                contexto.SState = new StateProductoListo();
+            }
+            else
+            {
+                //si aun falta completar el saldo
+                contexto.mensaje = "\nRecibiendo dinero...";
+                //continua recibiendo dinero
+                contexto.SState = new StateRecibirDinero();
+            }
+        }
+
+        public void ConsultarPrecio(Context contexto, string posicion)
+        {
+            //guarda temporal la etiqueta del producto consultado
+            contexto.seleccion = posicion;
+
+            //obtiene el precio y stock del producto correspondiente a la etiqueta
+            int precio = contexto.ObtenerPrecio(posicion);
+            int cantidad = contexto.ObtenerStock(posicion);
+
+            //para cuando no existe producto
+            if (precio == 0)
+            {
+                contexto.precio = 0; //quita el precio anterior
+                contexto.mensaje = "\nProducto no disponible";
+                return;
+            }
+
+            //verifica el stock, en caso de producto agotado
+            if (cantidad == 0)
+            {
+                contexto.precio = 0;
+                contexto.mensaje = "\nProducto agotado";
+                return;
+            }
+
+            contexto.precio = precio;
+        }
+
+        public void ElegirProducto(Context contexto, string posicion) { }
+
+        //aceptar antes de ingresar dinero
+        public void Confirmar(Context contexto)
+        {
+            contexto.mensaje = "\nIngrese dinero";
+        }
+
+        //cancelar sin haber realizado alguna operación
+        public void Cancelar(Context contexto)
+        {
+            contexto.mensaje = "\nSin operación";
+        }
+    }
+
+    public class StateRecibirDinero : State //-------------------------RECIBIR DINERO
+    {
+        public void IngresarDinero(Context contexto, int cantidad)
+        {
+            //agrega el valor de monedas o billetes al saldo actual
+            contexto.saldo += cantidad;
+
+            //si el saldo es mayor o igual al costo
+            if (contexto.saldo >= contexto.precio)
+            {
+                contexto.mensaje = "\nSaldo completo";
+                //cambia al estado de confirmar compra
+                contexto.SState = new StateProductoListo();
+            }
+            else
+            {
+                //si no se ha completado el costo
+                //sigue en el mismo estado
+                contexto.mensaje = "\nRecibiendo dinero...";
+            }
+        }
+
+        public void ConsultarPrecio(Context contexto, string posicion) { }
+
+        public void ElegirProducto(Context contexto, string posicion) { }
+
+        public void Confirmar(Context contexto)
+        {
+            //Si se confirma antes de completar el saldo
+            contexto.faltante = contexto.precio - contexto.saldo;
+
+            //alerta de que falta dinero
+            contexto.mensaje = "Saldo insuficiente \nFalta:";
+        }
+
+        public void Cancelar(Context contexto)
+        {
+            //si hay dinero ingresado antes de completar el saldo
+            if (contexto.saldo > 0)
+            {
+                contexto.mensaje = "\nReembolso Dinero";
+            }
+
+            //termina la compra
+            //limpia y regresa al estado inicial
+            contexto.Reiniciar();
+        }
+    }
+
+    public class StateProductoListo : State //---------------------SELECCIONAR PRODUCTO
+    {
+        public void IngresarDinero(Context contexto, int cantidad) { }
+
+        public void ConsultarPrecio(Context contexto, string posicion) { }
+
+        public void ElegirProducto(Context contexto, string posicion)
+        {
+            //actualiza la posición del producto
+            contexto.seleccion = posicion;
+        }
+
+        public void Confirmar(Context contexto)
+        {
+            //calcula el cambio a devolver
+            contexto.cambio = contexto.saldo - contexto.precio;
+
+            contexto.mensaje = "\nEntregando producto...";
+
+            //inicia a dispensar
+            contexto.SState = new StateDispensando();
+        }
+
+        public void Cancelar(Context contexto)
+        {
+            //en caso de cancelar antes de aceptar la compra
+            //pero despues de haber completado el saldo
+            //reembolsa el saldo completo
+            if (contexto.saldo > 0)
+            {
+                contexto.mensaje = "\nReembolso Saldo";
+            }
+
+            //termina la compra
+            //limpia y regresa al estado inicial
+            contexto.Reiniciar();
+        }
+    }
+
+    public class StateDispensando : State //-----------------------------------DISPENSANDO
+    {
+        public void IngresarDinero(Context contexto, int cantidad) { }
+
+        public void ConsultarPrecio(Context contexto, string posicion) { }
+
+        public void ElegirProducto(Context contexto, string posicion) { }
+
+        public void Confirmar(Context contexto)
+        {
+            //random para simular la falla de que se atore el producto
+            Random r = new Random();
+            int falla = r.Next(1, 11);
+
+            if (falla <= 5) //50% de que se atore un producto 
+            {
+                contexto.mensaje = "\nProducto atorado";
+                contexto.cambio = contexto.saldo; //devuelve todo el saldo
+            }
+            else //producto despachado sin inconvenientes
+            {
+                //se descuenta el producto del inventario
+                switch (contexto.seleccion)
+                {
+                    case "11": contexto.stock[0]--; break;
+                    case "15": contexto.stock[1]--; break;
+                    case "18": contexto.stock[2]--; break;
+                    case "19": contexto.stock[3]--; break;
+                    case "21": contexto.stock[4]--; break;
+                    case "23": contexto.stock[5]--; break;
+                    case "26": contexto.stock[6]--; break;
+                    case "28": contexto.stock[7]--; break;
+                    case "30": contexto.stock[8]--; break;
+                    case "33": contexto.stock[9]--; break;
+                    case "35": contexto.stock[10]--; break;
+                    case "37": contexto.stock[11]--; break;
+                    case "44": contexto.stock[12]--; break;
+                    case "45": contexto.stock[13]--; break;
+                    case "48": contexto.stock[14]--; break;
+                    case "49": contexto.stock[15]--; break;
+                }
+                contexto.mensaje = "\nProducto entregado";
+            }
+
+            //limpia y regresa al estado inicial
+            contexto.saldo = 0;
+            contexto.precio = 0;
+            contexto.seleccion = "";
+
+            //regresa al estado de espera
+            contexto.SState = new StateEspera();
+        }
+
+        public void Cancelar(Context contexto) { }
+    }    
+}
